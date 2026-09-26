@@ -5,6 +5,7 @@
 //   LLM_MODEL      model name. Default: nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free
 //   LLM_MODEL_QUICK optional cheaper/faster model for "quick" calls.
 //   LLM_API_STYLE  "openai" (default) or "anthropic" (native Anthropic Messages API).
+//   FALLBACK_API_KEY / FALLBACK_BASE_URL / FALLBACK_MODEL: optional second OpenAI-compatible provider, tried if the first fails.
 //   QUOTA_SECRET   shared secret for the Supabase take_quota() function.
 //   DAILY_PER_VISITOR (default 8) and DAILY_TOTAL (default 150): the caps.
 const crypto = require("crypto");
@@ -31,6 +32,26 @@ async function takeQuota(ip) {
 
 function stripThinking(text) {
   return String(text || "").replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/^[\s\S]*?<\/think>/i, "").trim();
+}
+
+
+async function openaiChat(p, msgs) {
+  try {
+    const r = await fetch(p.base.replace(/\/$/, "") + "/chat/completions", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + p.key, "content-type": "application/json" },
+      body: JSON.stringify({ model: p.model, messages: msgs, max_tokens: 6000, temperature: 0.8 }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const e = Array.isArray(data) ? data[0] && data[0].error : data.error;
+      return { status: r.status, message: (e && (e.message || e)) || r.statusText };
+    }
+    const choice = (data.choices || [])[0] || {};
+    const c = choice.message && choice.message.content;
+    const text = stripThinking(Array.isArray(c) ? c.map(x => x.text || "").join("") : c || "");
+    return text ? { text, truncated: choice.finish_reason === "length" } : { status: 502, message: "empty reply" };
+  } catch (e) { return { status: 502, message: "unreachable" }; }
 }
 
 module.exports = async (req, res) => {
@@ -83,20 +104,15 @@ module.exports = async (req, res) => {
         const last = msgs[msgs.length - 1];
         msgs[msgs.length - 1] = { role: "user", content: [{ type: "text", text: last.content }, ...images.map(u => ({ type: "image_url", image_url: { url: u } }))] };
       }
-      const r = await fetch((process.env.LLM_BASE_URL || "https://api.tokenrouter.com/v1").replace(/\/$/, "") + "/chat/completions", {
-        method: "POST",
-        headers: { Authorization: "Bearer " + key, "content-type": "application/json" },
-        body: JSON.stringify({ model, messages: msgs, max_tokens: 6000, temperature: 0.8 }),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        const m = (data.error && (data.error.message || data.error)) || r.statusText;
-        return fail(res, r.status === 429 ? 429 : 502, r.status === 429 ? "rate_limited" : /image|vision|multimodal/i.test(String(m)) ? "images_unavailable" : "upstream_error", String(m));
+      const providers = [{ key, base: process.env.LLM_BASE_URL || "https://api.tokenrouter.com/v1", model }];
+      if (process.env.FALLBACK_API_KEY) providers.push({ key: process.env.FALLBACK_API_KEY, base: process.env.FALLBACK_BASE_URL || "https://api.tokenrouter.com/v1", model: process.env.FALLBACK_MODEL || "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free" });
+      let lastErr = null;
+      for (const p of providers) {
+        const out = await openaiChat(p, msgs);
+        if (out.text) { text = out.text; truncated = out.truncated; lastErr = null; break; }
+        lastErr = out; console.error("provider failed", p.base, p.model, out.status, out.message);
       }
-      const choice = (data.choices || [])[0] || {};
-      const c = choice.message && choice.message.content;
-      text = Array.isArray(c) ? c.map(p => p.text || "").join("") : c || "";
-      truncated = choice.finish_reason === "length";
+      if (lastErr) return fail(res, lastErr.status === 429 ? 429 : 502, lastErr.status === 429 ? "rate_limited" : /image|vision|multimodal/i.test(String(lastErr.message)) ? "images_unavailable" : "upstream_error", String(lastErr.message || "The model couldn't answer."));
     }
     text = stripThinking(text);
     if (!text) return fail(res, 502, "empty_completion", "The model returned nothing.");

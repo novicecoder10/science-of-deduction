@@ -15,8 +15,9 @@ It is a static page plus one serverless function:
 | Name | Value |
 |---|---|
 | `LLM_API_KEY` | Your model provider key. Mark it **Sensitive**. |
-| `LLM_BASE_URL` | `https://api.tokenrouter.com/v1` (any OpenAI-compatible endpoint works) |
-| `LLM_MODEL` | e.g. `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`. Photo reading needs a model that accepts images. |
+| `LLM_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta/openai` for Gemini (any OpenAI-compatible endpoint works) |
+| `LLM_MODEL` | e.g. `gemini-3.6-flash`. Photo reading needs a model that accepts images. |
+| `FALLBACK_API_KEY`, `FALLBACK_BASE_URL`, `FALLBACK_MODEL` | Optional second provider, tried when the first fails (currently TokenRouter). |
 | `QUOTA_SECRET` | The shared secret for the database's `take_quota` function. |
 | `DAILY_PER_VISITOR` | Optional; AI calls per visitor per day (default 8). |
 | `DAILY_TOTAL` | Optional; AI calls for the whole site per day (default 150). |
