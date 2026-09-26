@@ -1,0 +1,13 @@
+{
+  "cleanUrls": true,
+  "functions": {
+    "api/sample.js": { "maxDuration": 60 }
+  },
+  "rewrites": [
+    { "source": "/_blob/static/:file", "destination": "/tour/:file" },
+    { "source": "/_blob/:file", "destination": "https://wfwuphdhaxwzsydnamms.supabase.co/storage/v1/object/public/tour/:file" }
+  ],
+  "headers": [
+    { "source": "/tour/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }] }
+  ]
+}
