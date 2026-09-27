@@ -1,0 +1,11 @@
+{
+  "name": "science-of-deduction",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A Sherlock Holmes deduction site in five rooms.",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "dev": "node dev-server.js",
+    "deploy": "git push origin main"
+  }
+}

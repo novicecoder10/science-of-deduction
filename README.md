@@ -2,13 +2,29 @@
 
 A Sherlock Holmes site in five rooms: the Examination (it reads you), the Stranger (you read a visitor), Your Object (an AI reads a photo of your things), the Monographs, and 221B Baker Street (a 3D walk and a photo tour).
 
-It is a static page plus one serverless function:
+It is a static page plus one serverless function. Live at https://scienceofdeduction.vercel.app
+
+## Run it on your computer
+
+1. Install Node.js 18 or later (nodejs.org).
+2. `cp .env.example .env` and fill in `LLM_API_KEY` (and `QUOTA_SECRET`: see the comment in the file).
+3. `npm run dev`, then open http://localhost:3000
+
+There is nothing to install: the dev server uses only Node's built-in modules. It serves the page, runs `api/sample.js` exactly as Vercel does, and applies the same `/_blob` rewrites. The shared casebook and tour come from the live Supabase database, so what you change locally in the tour is real.
+
+## Deploy
+
+Commit and `git push origin main`. Vercel rebuilds `scienceofdeduction.vercel.app` automatically in about a minute. Settings and keys live in Vercel → scienceofdeduction → Settings → Environment Variables.
+
+## Files
 
 - `index.html`: the whole site.
 - `claude-shim.js`: connects the page to the backend. AI calls go to `/api/sample`, the shared casebook and photo tour go to Supabase, and tour photos go to Supabase Storage.
 - `api/sample.js`: the Vercel function that calls the language model with the site owner's key, under a daily cap.
 - `tour/`: rendered images of the 221B sitting room, served as the built-in photo tour.
 - `vercel.json`: routes `/_blob/...` photo URLs to the tour folder or to Supabase Storage.
+- `dev-server.js`, `package.json`, `.env.example`: local development.
+- `supabase/schema.sql`: rebuilds the database in a fresh Supabase project.
 
 ## Environment variables (Vercel → Project → Settings → Environment Variables)
 
